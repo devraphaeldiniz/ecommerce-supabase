@@ -1,0 +1,23 @@
+{
+  "name": "ecommerce-supabase",
+  "version": "1.0.0",
+  "description": "",
+  "type": "module",
+  "main": "index.js",
+  "directories": {
+    "test": "tests"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "seed": "node scripts/seed.js",
+    "db:push": "npx supabase db push",
+    "functions:deploy": "npx supabase functions deploy send-order-email --no-verify-jwt && npx supabase functions deploy export-order-csv --no-verify-jwt"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.75.0",
+    "dotenv": "^17.2.3"
+  }
+}
