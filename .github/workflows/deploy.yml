@@ -1,0 +1,274 @@
+# ============================================
+# GitHub Actions - Deploy Supabase
+# Deploy automático de migrations e Edge Functions
+# ============================================
+
+name: Deploy to Supabase
+
+on:
+  push:
+    branches:
+      - main
+      - production
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch: # Permite execução manual
+
+# Variáveis de ambiente globais
+env:
+  NODE_VERSION: '20'
+  SUPABASE_CLI_VERSION: '1.127.4'
+
+jobs:
+  # ============================================
+  # Job 1: Lint e Validação
+  # ============================================
+  lint:
+    name: Lint e Validação
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Validar estrutura SQL
+        run: |
+          echo "Validando arquivos SQL..."
+          for file in supabase/migrations/*.sql; do
+            if [ -f "$file" ]; then
+              echo "✓ Validando $file"
+              # Verifica sintaxe básica
+              if ! grep -q "CREATE\|ALTER\|DROP\|INSERT" "$file"; then
+                echo "⚠️  Aviso: $file pode não conter SQL válido"
+              fi
+            fi
+          done
+
+      - name: Validar Edge Functions
+        run: |
+          echo "Validando Edge Functions..."
+          if [ -d "supabase/functions" ]; then
+            for dir in supabase/functions/*/; do
+              if [ -f "${dir}index.ts" ]; then
+                echo "✓ Encontrada função: $(basename $dir)"
+              fi
+            done
+          fi
+
+  # ============================================
+  # Job 2: Testes (se houver)
+  # ============================================
+  test:
+    name: Executar Testes
+    runs-on: ubuntu-latest
+    needs: lint
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Instalar dependências
+        run: |
+          if [ -f "package.json" ]; then
+            npm ci
+          fi
+
+      - name: Executar testes
+        run: |
+          if [ -f "package.json" ] && grep -q '"test"' package.json; then
+            npm test
+          else
+            echo "⚠️  Nenhum teste configurado"
+          fi
+
+  # ============================================
+  # Job 3: Deploy para Supabase
+  # ============================================
+  deploy:
+    name: Deploy Supabase
+    runs-on: ubuntu-latest
+    needs: lint
+    # Só faz deploy em push para main/production
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/production')
+    
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      # ============================================
+      # Instalar Supabase CLI
+      # ============================================
+      - name: Instalar Supabase CLI
+        run: |
+          echo "Instalando Supabase CLI v${{ env.SUPABASE_CLI_VERSION }}..."
+          npm install -g supabase@${{ env.SUPABASE_CLI_VERSION }}
+          supabase --version
+
+      # ============================================
+      # Configurar Supabase
+      # ============================================
+      - name: Configurar Supabase
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        run: |
+          echo "Configurando Supabase..."
+          supabase link --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
+
+      # ============================================
+      # Deploy Database Migrations
+      # ============================================
+      - name: Aplicar Migrations do Banco
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        run: |
+          echo "📦 Aplicando migrations do banco de dados..."
+          
+          # Verifica se há migrations para aplicar
+          if [ -d "supabase/migrations" ] && [ "$(ls -A supabase/migrations/*.sql 2>/dev/null)" ]; then
+            supabase db push
+            echo "✅ Migrations aplicadas com sucesso!"
+          else
+            echo "⚠️  Nenhuma migration encontrada"
+          fi
+
+      # ============================================
+      # Deploy Edge Functions
+      # ============================================
+      - name: Deploy Edge Functions
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          SENDGRID_API_KEY: ${{ secrets.SENDGRID_API_KEY }}
+          FROM_EMAIL: ${{ secrets.FROM_EMAIL }}
+          SITE_URL: ${{ secrets.SITE_URL }}
+        run: |
+          echo "🚀 Deploying Edge Functions..."
+          
+          if [ -d "supabase/functions" ]; then
+            # Deploy cada função individualmente
+            for func_dir in supabase/functions/*/; do
+              if [ -d "$func_dir" ]; then
+                func_name=$(basename "$func_dir")
+                echo "Deploying function: $func_name"
+                
+                # Deploy com secrets
+                supabase functions deploy "$func_name" \
+                  --project-ref ${{ secrets.SUPABASE_PROJECT_REF }} \
+                  --no-verify-jwt
+                
+                # Configurar secrets para a função
+                if [ "$func_name" = "send-order-email" ]; then
+                  supabase secrets set \
+                    SENDGRID_API_KEY="$SENDGRID_API_KEY" \
+                    FROM_EMAIL="$FROM_EMAIL" \
+                    SITE_URL="$SITE_URL" \
+                    --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
+                fi
+                
+                echo "✅ Função $func_name deployed!"
+              fi
+            done
+          else
+            echo "⚠️  Nenhuma Edge Function encontrada"
+          fi
+
+      # ============================================
+      # Verificação pós-deploy
+      # ============================================
+      - name: Verificar Deploy
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          echo "🔍 Verificando deploy..."
+          
+          # Testa conexão com Supabase
+          response=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "apikey: $SUPABASE_ANON_KEY" \
+            "$SUPABASE_URL/rest/v1/")
+          
+          if [ "$response" = "200" ]; then
+            echo "✅ API Supabase está respondendo"
+          else
+            echo "❌ Erro ao conectar com API (HTTP $response)"
+            exit 1
+          fi
+
+      # ============================================
+      # Notificação de sucesso
+      # ============================================
+      - name: Notificar Sucesso
+        if: success()
+        run: |
+          echo "🎉 Deploy concluído com sucesso!"
+          echo "Branch: ${{ github.ref_name }}"
+          echo "Commit: ${{ github.sha }}"
+          echo "Autor: ${{ github.actor }}"
+
+      # ============================================
+      # Notificação de erro
+      # ============================================
+      - name: Notificar Erro
+        if: failure()
+        run: |
+          echo "❌ Deploy falhou!"
+          echo "Verifique os logs acima para mais detalhes"
+
+  # ============================================
+  # Job 4: Criar Release (opcional)
+  # ============================================
+  release:
+    name: Criar Release
+    runs-on: ubuntu-latest
+    needs: deploy
+    if: github.ref == 'refs/heads/production'
+    
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Necessário para tags
+
+      - name: Obter versão
+        id: version
+        run: |
+          # Pega a última tag ou usa 0.0.0
+          VERSION=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Versão atual: $VERSION"
+
+      - name: Criar Release Notes
+        run: |
+          echo "# Release Notes" > release-notes.md
+          echo "" >> release-notes.md
+          echo "## Mudanças" >> release-notes.md
+          git log --pretty=format:"- %s (%an)" -10 >> release-notes.md
+
+      - name: Criar Release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ steps.version.outputs.version }}-${{ github.run_number }}
+          release_name: Release ${{ steps.version.outputs.version }}-${{ github.run_number }}
+          body_path: release-notes.md
+          draft: false
+          prerelease: false

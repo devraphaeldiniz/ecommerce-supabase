@@ -1,23 +1,82 @@
 {
-  "name": "ecommerce-supabase",
+  "name": "ecommerce-supabase-backend",
   "version": "1.0.0",
-  "description": "",
-  "type": "module",
+  "description": "Backend completo para e-commerce com Supabase, PostgreSQL, RLS e Edge Functions",
   "main": "index.js",
-  "directories": {
-    "test": "tests"
-  },
+  "type": "module",
   "scripts": {
     "test": "vitest run",
+    "test:watch": "vitest watch",
+    "test:coverage": "vitest run --coverage",
+    "test:ui": "vitest --ui",
+    "db:push": "supabase db push",
+    "db:reset": "supabase db reset",
+    "db:diff": "supabase db diff",
+    "db:lint": "supabase db lint",
+    "functions:serve": "supabase functions serve",
+    "functions:deploy": "npm run functions:deploy:all",
+    "functions:deploy:all": "supabase functions deploy send-order-email && supabase functions deploy export-order-csv",
+    "functions:deploy:email": "supabase functions deploy send-order-email",
+    "functions:deploy:csv": "supabase functions deploy export-order-csv",
     "seed": "node scripts/seed.js",
-    "db:push": "npx supabase db push",
-    "functions:deploy": "npx supabase functions deploy send-order-email --no-verify-jwt && npx supabase functions deploy export-order-csv --no-verify-jwt"
+    "link": "supabase link",
+    "start": "supabase start",
+    "stop": "supabase stop",
+    "status": "supabase status",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "prepare": "husky install"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "keywords": [
+    "supabase",
+    "ecommerce",
+    "backend",
+    "postgresql",
+    "edge-functions",
+    "rls",
+    "api"
+  ],
+  "author": "Seu Nome",
+  "license": "MIT",
   "dependencies": {
-    "@supabase/supabase-js": "^2.75.0",
-    "dotenv": "^17.2.3"
-  }
+    "@supabase/supabase-js": "^2.38.4",
+    "dotenv": "^16.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "@vitest/coverage-v8": "^1.0.4",
+    "@vitest/ui": "^1.0.4",
+    "eslint": "^8.55.0",
+    "eslint-config-prettier": "^9.1.0",
+    "husky": "^8.0.3",
+    "lint-staged": "^15.2.0",
+    "prettier": "^3.1.1",
+    "supabase": "^1.127.4",
+    "typescript": "^5.3.3",
+    "vitest": "^1.0.4"
+  },
+  "lint-staged": {
+    "*.{js,ts,tsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{json,md,yml,yaml}": [
+      "prettier --write"
+    ],
+    "*.sql": [
+      "supabase db lint"
+    ]
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "npm": ">=10.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://https://github.com/devraphaeldiniz/ecommerce-supabase.git"
+  },
+  "bugs": {
+    "url": "https://https://github.com/devraphaeldiniz/ecommerce-supabase/issues"
+  },
+  "homepage": "https://https://github.com/devraphaeldiniz/ecommerce-supabase#readme"
 }
