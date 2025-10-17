@@ -19,40 +19,70 @@
 ## Funcionalidades Implementadas
 
 ### Banco de Dados PostgreSQL
-- 5 tabelas relacionadas (profiles, products, orders, order_items, order_events)
-- Triggers automáticos para cálculos de totais
-- Índices para otimização de queries
-- 3 Views para consultas complexas
+- 8 tabelas relacionadas (profiles, products, orders, order_items, order_events, user_roles, access_logs, security_violations)
+- 6 views para consultas otimizadas
+- 3 materialized views para analytics (daily_sales_stats, product_performance_stats, customer_rfm_segments)
+- 35+ índices estratégicos (compostos, parciais, full-text search)
+- Triggers automáticos para cálculos e auditoria
 
 ### Segurança
 - Row Level Security (RLS) em todas as tabelas
-- Políticas de acesso por role (cliente/admin)
-- Autenticação via JWT
-- Sistema de auditoria com logs de eventos
+- RBAC com 4 níveis (customer, staff, admin, super_admin)
+- Sistema completo de auditoria
+- Políticas granulares de acesso
+- Logs de tentativas não autorizadas
 
 ### Edge Functions
-- **send-order-email**: Envio de notificações por email
-- **export-order-csv**: Exportação de dados para análise
+- **send-order-email**: Envio de notificações por email com rate limiting
+- **export-order-csv**: Exportação de pedidos em formato CSV
 
 ### API REST
 - Endpoints auto-gerados pelo PostgREST
 - Suporte a filtros, ordenação e paginação
-- Documentação via Postman Collection
+- 15+ funções RPC customizadas
 
-### CI/CD
-- GitHub Actions para deploy automático
-- Pipeline completo de migrations e functions
-- Configuração de secrets automatizada
+### Qualidade e Testes
+- 27 testes automatizados (100% passando)
+- Script de validação completa
+- CI/CD configurado com GitHub Actions
+- Documentação técnica completa
 
 ---
 
-## Dados de Teste
+## Estrutura de Dados
 
-O banco foi populado com dados de exemplo:
-- 1 perfil de cliente
-- 3 produtos em diferentes categorias
-- 1 pedido completo com itens
-- Eventos de auditoria registrados
+### Tabelas Core
+```
+profiles          - Perfis de usuários
+products          - Catálogo de produtos
+orders            - Pedidos
+order_items       - Itens dos pedidos
+order_events      - Histórico de eventos
+```
+
+### Segurança e RBAC
+```
+user_roles            - Sistema de roles
+access_logs           - Log de acessos
+security_violations   - Tentativas não autorizadas
+```
+
+### Views (Consultas Otimizadas)
+```
+customer_orders_summary   - Resumo de pedidos por cliente
+products_low_stock        - Alertas de estoque baixo
+recent_orders_details     - Pedidos recentes com detalhes
+top_selling_products      - Produtos mais vendidos
+orders_status_overview    - Overview de pedidos por status
+inactive_customers        - Clientes inativos (60+ dias)
+```
+
+### Materialized Views (Analytics)
+```
+daily_sales_stats         - Estatísticas diárias de vendas
+product_performance_stats - Performance de produtos
+customer_rfm_segments     - Segmentação RFM de clientes
+```
 
 ---
 
@@ -60,6 +90,19 @@ O banco foi populado com dados de exemplo:
 
 ### Visualizar no Supabase Studio
 Acesse: https://app.supabase.com/project/byjwgtztyafzgxxzvnge/editor
+
+### Executar validação completa
+```bash
+git clone https://github.com/devraphaeldiniz/ecommerce-supabase.git
+cd ecommerce-supabase
+npm install
+npm run validate:complete
+npm test
+```
+
+**Resultado esperado:**
+- 24 verificações passando
+- 27 testes automatizados passando
 
 ### Testar API REST
 
@@ -82,7 +125,13 @@ Cliente (Frontend)
       ↓
 Supabase API Gateway
       ↓
-PostgreSQL + RLS
+┌─────────────────────┐
+│ PostgreSQL Database │
+│  • RLS Policies     │
+│  • RBAC System      │
+│  • Audit Logs       │
+│  • 35+ Indexes      │
+└─────────────────────┘
       ↓
 Edge Functions (Deno)
 ```
@@ -93,8 +142,21 @@ Edge Functions (Deno)
 ```
 ecommerce-supabase/
 ├── supabase/
-│   ├── migrations/          # SQL migrations
+│   ├── migrations/          # 10 arquivos SQL
+│   │   ├── 001_init.sql
+│   │   ├── 002_compatibility.sql
+│   │   ├── 003_rls.sql
+│   │   ├── 004_functions_triggers.sql
+│   │   ├── 005_seed_data.sql
+│   │   ├── 006_create_views.sql
+│   │   ├── 007_create_materialized_views.sql
+│   │   ├── 008_add_rbac.sql
+│   │   ├── 009_audit_and_delete_policies.sql
+│   │   └── 010_advanced_indexes.sql
 │   └── functions/           # Edge Functions
+│       ├── send-order-email/
+│       └── export-order-csv/
+├── tests/                   # 27 testes
 ├── scripts/                 # Utilitários
 ├── .github/workflows/       # CI/CD
 └── docs/                    # Documentação
@@ -104,10 +166,14 @@ ecommerce-supabase/
 
 ## Diferenciais
 
-- Segurança robusta com RLS
+- Segurança robusta com RLS e RBAC
+- Sistema completo de auditoria
+- Views e Materialized Views para performance
+- 35+ índices estratégicos
 - Edge Functions serverless
+- 27 testes automatizados
 - CI/CD totalmente automatizado
-- Documentação completa
+- Documentação técnica completa
 - Código limpo e bem estruturado
 - Pronto para produção
 
@@ -119,8 +185,8 @@ git clone https://github.com/devraphaeldiniz/ecommerce-supabase.git
 cd ecommerce-supabase
 npm install
 npm run db:push
-npm run seed
-npm run validate
+npm run validate:complete
+npm test
 ```
 
 ---
@@ -135,4 +201,5 @@ Telefone: (31) 99440-2252
 
 ---
 
-*Desenvolvido com Supabase, PostgreSQL e TypeScript*
+*Desenvolvido com Supabase, PostgreSQL e TypeScript*  
+*Backend completo com RLS, RBAC, Auditoria e Analytics*

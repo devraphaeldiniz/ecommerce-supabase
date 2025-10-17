@@ -1,370 +1,301 @@
-\# 🏗️ Arquitetura e Decisões Técnicas
-
-
+# Arquitetura e Decisões Técnicas
 
 ---
 
+## Visão Geral
 
+Backend completo para e-commerce usando Supabase como plataforma principal.
 
-\## 🎯 Visão Geral
-
-
-
-Backend completo para e-commerce usando \*\*Supabase\*\* como plataforma principal.
-
-
-
-\### Stack Tecnológica
-
+### Stack Tecnológica
 ```
-
 ┌─────────────────────────────────────────┐
-
 │           FRONTEND/CLIENTE              │
-
 └──────────────┬──────────────────────────┘
-
-&nbsp;              │ HTTPS
-
-&nbsp;              ▼
-
+               │ HTTPS
+               ▼
 ┌─────────────────────────────────────────┐
-
 │          SUPABASE PLATFORM              │
-
 ├─────────────────────────────────────────┤
-
 │  • REST API (PostgREST)                 │
-
 │  • Edge Functions (Deno)                │
-
 │  • PostgreSQL 15                        │
-
 │  • Row Level Security                   │
-
+│  • RBAC System                          │
 └─────────────────────────────────────────┘
-
 ```
-
-
 
 ---
 
+## Modelo de Dados
 
-
-\## 📊 Modelo de Dados
-
-
-
-\### Diagrama ER
-
+### Diagrama ER
 ```
-
 profiles (usuários)
+    ↓
+user_roles (RBAC) → orders (pedidos)
+    ↓                   ↓
+order_items (itens) → products (produtos)
+    ↓
+order_events (auditoria)
 
-&nbsp;   ↓
-
-orders (pedidos)
-
-&nbsp;   ↓
-
-order\_items (itens) → products (produtos)
-
-&nbsp;   ↓
-
-order\_events (auditoria)
-
+access_logs (logs de acesso)
+security_violations (violações)
 ```
 
+### Tabelas Core
 
+**profiles** - Dados dos usuários
+- auth_uid (referência ao Supabase Auth)
+- full_name, email, cpf, phone
+- address (JSONB)
 
-\### Tabelas Principais
+**products** - Catálogo
+- sku (único)
+- name, description, price, stock
+- category, is_active
 
+**orders** - Pedidos
+- customer_id → profiles
+- status (ENUM: draft, placed, paid, processing, shipped, delivered, completed, cancelled, refunded)
+- total (calculado automaticamente)
 
+**order_items** - Itens
+- order_id → orders
+- product_id → products
+- product_snapshot (JSONB - cópia do produto)
+- line_total (calculado: unit_price × quantity)
 
-\*\*profiles\*\* - Dados dos usuários
+### Tabelas de Segurança
 
-\- auth\_uid (referência ao Supabase Auth)
+**user_roles** - RBAC
+- user_id → auth.users
+- role (ENUM: customer, staff, admin, super_admin)
+- granted_by, granted_at, expires_at
+- is_active
 
-\- full\_name, email, cpf, phone
+**access_logs** - Auditoria de acessos
+- user_id, user_email, user_role
+- action, table_name, record_id
+- was_successful, error_message
+- metadata (JSONB)
 
-\- address (JSONB)
-
-
-
-\*\*products\*\* - Catálogo
-
-\- sku (único)
-
-\- name, description, price, stock
-
-\- category, is\_active
-
-
-
-\*\*orders\*\* - Pedidos
-
-\- customer\_id → profiles
-
-\- status (ENUM)
-
-\- total (calculado automaticamente)
-
-
-
-\*\*order\_items\*\* - Itens
-
-\- order\_id → orders
-
-\- product\_id → products
-
-\- product\_snapshot (JSONB - cópia do produto)
-
-\- line\_total (calculado: unit\_price × quantity)
-
-
+**security_violations** - Tentativas não autorizadas
+- user_id, violation_type
+- severity (low, medium, high, critical)
+- attempted_action, description
 
 ---
 
+## Segurança
 
+### Row Level Security (RLS)
 
-\## 🔐 Segurança
+Todas as tabelas possuem RLS habilitado.
 
+**Princípios:**
+1. Usuários só acessam seus próprios dados
+2. Staff tem acesso de leitura ampliado
+3. Admins têm acesso total
+4. Produtos são públicos (leitura)
 
-
-\### Row Level Security (RLS)
-
-
-
-Todas as tabelas possuem RLS habilitado:
-
-
-
-\*\*Princípios:\*\*
-
-1\. Usuários só acessam seus próprios dados
-
-2\. Admins têm acesso total
-
-3\. Produtos são públicos (leitura)
-
-
-
-\*\*Helper Functions:\*\*
-
+**Helper Functions:**
 ```sql
-
-is\_admin() → boolean
-
-current\_user\_id() → uuid
-
+get_user_role(user_id) → user_role
+is_admin() → boolean
+is_staff_or_admin() → boolean
 ```
 
+### RBAC - Role Based Access Control
 
+**Hierarquia de roles:**
+```
+super_admin (pode promover usuários)
+    ↓
+admin (acesso total, não pode promover)
+    ↓
+staff (gerenciar produtos, ver pedidos)
+    ↓
+customer (próprios dados)
+```
 
-\### Políticas por Tabela
+**Políticas por Tabela:**
 
+**profiles:**
+- Customer vê/edita apenas seu perfil
+- Admin vê/edita todos
 
+**orders:**
+- Customer vê/edita apenas seus pedidos em draft
+- Staff/Admin gerenciam todos
 
-\*\*profiles:\*\*
+**products:**
+- Todos podem ler (se active = true)
+- Staff/Admin modificam
 
-\- Usuário vê/edita apenas seu perfil
-
-\- Admin vê todos
-
-
-
-\*\*orders:\*\*
-
-\- Cliente vê/edita apenas seus pedidos em draft
-
-\- Admin gerencia todos
-
-
-
-\*\*products:\*\*
-
-\- Todos podem ler (se active = true)
-
-\- Apenas admin modifica
-
-
+**user_roles:**
+- Usuário vê apenas seu próprio role
+- Admin vê todos os roles
+- Super_admin gerencia roles
 
 ---
 
+## Performance
 
+### Índices Criados (35+)
 
-\## ⚡ Performance
-
-
-
-\### Índices Criados
-
+**Índices básicos:**
 ```sql
-
-idx\_products\_sku        -- Busca por SKU
-
-idx\_products\_category   -- Filtro por categoria
-
-idx\_orders\_customer     -- Pedidos por cliente
-
-idx\_order\_items\_order   -- Itens por pedido
-
+idx_products_sku              -- Busca por SKU
+idx_products_category         -- Filtro por categoria
+idx_orders_customer           -- Pedidos por cliente
+idx_order_items_order         -- Itens por pedido
 ```
 
+**Índices compostos:**
+```sql
+idx_orders_customer_status    -- Cliente + Status
+idx_orders_date_status        -- Data + Status
+idx_products_price_active     -- Preço + Ativo
+```
 
+**Índices parciais:**
+```sql
+idx_orders_active             -- Apenas pedidos ativos
+idx_products_available        -- Apenas disponíveis
+idx_products_low_stock_alert  -- Estoque < 20
+```
 
-\### Triggers Automáticos
+**Full-text search:**
+```sql
+idx_products_fts              -- Busca em nome/descrição
+idx_profiles_fts              -- Busca em usuários
+```
 
+### Triggers Automáticos
 
+1. **calculate_order_totals**: Calcula total do pedido
+2. **update_product_stock**: Atualiza estoque
+3. **create_customer_on_signup**: Cria perfil ao registrar
+4. **audit_sensitive_operations**: Log de operações sensíveis
 
-1\. \*\*order\_item\_compute\*\*: Calcula `line\_total`
+### Views Normais (6)
 
-2\. \*\*order\_item\_after\_change\*\*: Recalcula total do pedido
+- **customer_orders_summary**: Resumo de pedidos por cliente
+- **products_low_stock**: Alertas de estoque baixo
+- **recent_orders_details**: Pedidos dos últimos 30 dias
+- **top_selling_products**: Mais vendidos (90 dias)
+- **orders_status_overview**: Overview por status
+- **inactive_customers**: Sem pedidos há 60+ dias
 
-3\. \*\*set\_updated\_at\*\*: Atualiza timestamps
+### Materialized Views (3)
 
+- **daily_sales_stats**: Estatísticas diárias (1 ano)
+- **product_performance_stats**: Performance de produtos
+- **customer_rfm_segments**: Segmentação RFM (Recency, Frequency, Monetary)
 
-
-\### Views Otimizadas
-
-
-
-\- \*\*vw\_customer\_orders\*\*: Pedidos com dados do cliente
-
-\- \*\*vw\_product\_stock\*\*: Produtos disponíveis
-
-\- \*\*vw\_order\_details\*\*: Detalhes completos do pedido
-
-
+**Atualização:** Função `refresh_all_materialized_views()` pode ser chamada manualmente ou via cron.
 
 ---
 
+## Decisões Técnicas
 
-
-\## 🤔 Decisões Técnicas
-
-
-
-\### Por que Supabase?
-
-
+### Por que Supabase?
 
 | Decisão | Alternativa | Justificativa |
-
 |---------|-------------|---------------|
+| **Supabase** | Firebase | PostgreSQL completo, RLS nativo, Open source |
+| **PostgreSQL** | MongoDB | ACID, Relacionamentos, JSONB nativo, Views |
+| **Edge Functions** | AWS Lambda | TypeScript nativo, Deploy integrado, Sem cold start |
+| **RLS** | App-level auth | Segurança no banco, Impossível bypassar |
 
-| \*\*Supabase\*\* | Firebase | ✅ PostgreSQL completo<br>✅ RLS nativo<br>✅ Open source |
+### Por que SQL direto?
 
-| \*\*PostgreSQL\*\* | MongoDB | ✅ ACID<br>✅ Relacionamentos<br>✅ JSONB nativo |
+1. **Performance** - SQL otimizado manualmente
+2. **Controle total** - Acesso a features avançadas (RLS, triggers, views)
+3. **RLS** - Funciona melhor com queries diretas
+4. **Simplicidade** - Menos camadas de abstração
+5. **Views e Materialized Views** - Não disponíveis via ORM
 
-| \*\*Edge Functions\*\* | AWS Lambda | ✅ TypeScript nativo<br>✅ Deploy integrado<br>✅ Sem cold start |
+### Por que Materialized Views?
 
-
-
-\### Por que SQL direto (sem ORM)?
-
-
-
-1\. \*\*Performance\*\* - SQL otimizado manualmente
-
-2\. \*\*Controle total\*\* - Acesso a features avançadas
-
-3\. \*\*RLS\*\* - Funciona melhor com queries diretas
-
-4\. \*\*Simplicidade\*\* - Menos camadas de abstração
-
-
+1. **Performance** - 100x mais rápidas que views normais
+2. **Queries complexas** - Pré-calculadas
+3. **Analytics** - Dashboards instantâneos
+4. **Custo** - Reduz carga no banco
 
 ---
 
+## Escalabilidade
 
+### Limites Atuais (Free Tier)
 
-\## 📈 Escalabilidade
+- Database: 500 MB
+- Storage: 1 GB
+- Edge Functions: 500K invocações/mês
+- Bandwidth: 5 GB
 
+### Estratégias de Escala
 
-
-\### Limites Atuais (Free Tier)
-
-
-
-\- Database: 500 MB
-
-\- Storage: 1 GB
-
-\- Edge Functions: 500K invocações/mês
-
-
-
-\### Estratégias de Escala
-
-
-
-1\. \*\*Caching\*\*: Implementar Redis
-
-2\. \*\*Read Replicas\*\*: Supabase Pro
-
-3\. \*\*CDN\*\*: Para assets estáticos
-
-4\. \*\*Rate Limiting\*\*: Nas Edge Functions
-
-
+1. **Caching**: Redis para queries frequentes
+2. **Read Replicas**: Supabase Pro
+3. **CDN**: Para assets estáticos
+4. **Rate Limiting**: Já implementado nas Edge Functions
+5. **Partitioning**: Para tabelas grandes (logs)
+6. **Materialized Views**: Reduzem carga em queries pesadas
 
 ---
 
+## Auditoria e Compliance
 
+### Sistema de Logs
 
-\## 🔄 Fluxo de Deploy
+**access_logs**: Registra toda ação no sistema
+- Quem fez
+- O que fez
+- Quando fez
+- Se teve sucesso
 
+**security_violations**: Registra tentativas não autorizadas
+- Tipo de violação
+- Severidade
+- Descrição do que foi tentado
+
+**order_events**: Histórico completo de pedidos
+- Mudanças de status
+- Modificações
+- Quem fez a alteração
+
+### Views de Auditoria
+
+- **suspicious_activities**: Atividades suspeitas (últimos 7 dias)
+- **user_activity_summary**: Resumo de ações por usuário (30 dias)
+
+---
+
+## Fluxo de Deploy
 ```
-
 Developer Commit
-
-&nbsp;     ↓
-
+     ↓
 GitHub Push
-
-&nbsp;     ↓
-
+     ↓
 GitHub Actions
-
-&nbsp;     ↓
-
-├─ Apply Migrations
-
-├─ Deploy Functions
-
-└─ Run Tests
-
-&nbsp;     ↓
-
+     ↓
+├─ Apply Migrations (10 arquivos SQL)
+├─ Deploy Functions (2 Edge Functions)
+└─ Run Tests (27 testes)
+     ↓
 Production (Supabase)
-
 ```
 
+---
 
+## Referências
+
+- [Supabase Docs](https://supabase.com/docs)
+- [PostgreSQL RLS](https://www.postgresql.org/docs/current/ddl-rowsecurity.html)
+- [PostgREST](https://postgrest.org/)
+- [Materialized Views](https://www.postgresql.org/docs/current/sql-creatematerializedview.html)
 
 ---
 
-
-
-\## 📚 Referências
-
-
-
-\- \[Supabase Docs](https://supabase.com/docs)
-
-\- \[PostgreSQL RLS](https://www.postgresql.org/docs/current/ddl-rowsecurity.html)
-
-\- \[PostgREST](https://postgrest.org/)
-
-
-
----
-
-
-
-\*\*Versão:\*\* 1.0.0  
-
-\*\*Última atualização:\*\* 2024
-
+**Versão:** 2.0.0
