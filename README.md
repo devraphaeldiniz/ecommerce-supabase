@@ -1,227 +1,153 @@
 # E-commerce Backend - Supabase
 
-Backend completo para e-commerce desenvolvido com Supabase, incluindo banco de dados PostgreSQL, Row Level Security (RLS), RBAC, auditoria, Edge Functions e pipeline CI/CD automatizado.
+[![CI/CD](https://github.com/devraphaeldiniz/ecommerce-supabase/actions/workflows/main.yml/badge.svg)](https://github.com/devraphaeldiniz/ecommerce-supabase/actions)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15%2B-336791?style=flat-square&logo=postgresql)](https://www.postgresql.org)
+[![Supabase](https://img.shields.io/badge/Supabase-Enabled-3ECF8E?style=flat-square&logo=supabase)](https://supabase.com)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.0-3178C6?style=flat-square&logo=typescript)](https://www.typescriptlang.org)
+[![License](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](LICENSE)
 
-## Características
-
-### Banco de Dados
-- Schema com 8 tabelas relacionadas
-- 6 views para consultas otimizadas
-- 3 materialized views para analytics
-- 35+ índices estratégicos para performance
-- Triggers automáticos para cálculos e auditoria
-
-### Segurança
-- Row Level Security em todas as tabelas
-- RBAC com 4 níveis (customer, staff, admin, super_admin)
-- Sistema completo de auditoria (access_logs, security_violations)
-- Políticas granulares de acesso
-
-### Edge Functions
-- **send-order-email**: Envio de emails transacionais
-- **export-order-csv**: Exportação de pedidos em CSV
-
-### Qualidade
-- 27 testes automatizados
-- Validação completa de setup
-- CI/CD com GitHub Actions
+Infraestrutura de backend e dados para e-commerce construída sobre PostgreSQL e Supabase. O projeto soluciona o desafio de segurança e governança de dados em sistemas multi-usuário diretamente na camada de banco de dados, utilizando Row Level Security (RLS) granular, RBAC em 4 níveis e triggers automáticos de auditoria.
 
 ---
 
-## Pré-requisitos
+## 🏗️ Arquitetura do Sistema
 
+```mermaid
+flowchart TD
+    Client[Cliente / Frontend] -->|HTTPS REST / RPC| PostgREST[PostgREST Gateway]
+    Client -->|Autenticação| Auth[Supabase GoTrue Auth]
+    
+    subgraph PostgreSQL 15+ Core
+        direction TB
+        RLS[Row Level Security & RBAC]
+        PostgREST --> RLS
+        
+        subgraph Tabelas e Regras de Negócio
+            Profiles[(profiles)]
+            Products[(products)]
+            Orders[(orders & order_items)]
+            Roles[(user_roles)]
+        end
+        
+        RLS --> Profiles
+        RLS --> Products
+        RLS --> Orders
+        RLS --> Roles
+        
+        subgraph Auditoria Automatica
+            Triggers[Triggers em tempo de escrita]
+            AccessLogs[(access_logs)]
+            Violations[(security_violations)]
+        end
+        
+        Orders --> Triggers
+        Roles --> Triggers
+        Triggers --> AccessLogs
+        Triggers --> Violations
+        
+        subgraph Analytics & Otimizacao
+            Views[6 Views de Negócio]
+            MatViews[3 Materialized Views: RFM e Vendas]
+        end
+        
+        Orders --> Views
+        Orders --> MatViews
+    end
+    
+    Client -->|Edge Requests| EdgeFn[Deno Edge Functions: send-order-email, export-order-csv]
+    EdgeFn --> PostgREST
+```
+
+---
+
+## ✨ Funcionalidades Principais
+
+- **Segurança Nativa no Banco (RLS Granular):** Políticas de Row Level Security em 100% das tabelas, garantindo que usuários comuns acessem estritamente seus próprios pedidos e perfis, sem depender de validações manuais na camada de aplicação.
+- **RBAC Hierárquico em 4 Níveis:** Papéis (`customer`, `staff`, `admin`, `super_admin`) mapeados na tabela `user_roles` e validados via funções PL/pgSQL.
+- **Trilha de Auditoria em Tempo Real:** Registro automático de tentativas de acesso, modificações críticas e violações de segurança em `access_logs` e `security_violations`.
+- **Analytics com Materialized Views:** Processamento pré-computado de métricas de vendas diárias e segmentação RFM (Recência, Frequência, Valor Monetário) para clientes.
+- **Edge Functions Desacopladas:** Disparo de e-mails transacionais e geração de relatórios de pedidos em CSV via Deno runtime.
+- **35+ Índices Estratégicos:** Cobertura de índices B-Tree e compostos para chaves estrangeiras, status de pedidos e filtros frequentes de catálogo.
+
+---
+
+## 🛠️ Stack Tecnológica & Decisões Técnicas
+
+| Componente | Tecnologia | Decisão Técnica |
+| :--- | :--- | :--- |
+| **Banco de Dados** | PostgreSQL 15+ | Motor relacional robusto com suporte nativo a RLS, triggers procedurais em PL/pgSQL e materialized views com atualização concorrente. |
+| **BaaS / Gateway** | Supabase (PostgREST + GoTrue) | Elimina boilerplate de CRUD gerando APIs REST seguras e tipadas diretamente a partir do esquema relacional com JWT nativo. |
+| **Serverless** | Supabase Edge Functions (Deno) | Baixa latência e isolamento para tarefas assíncronas que requerem chamadas a serviços externos (envio de e-mails e exportação). |
+| **Testes & Scripts** | TypeScript + Vitest | Validação automatizada de regras de integridade do banco e execução de suíte de testes de RLS. |
+
+---
+
+## 🚀 Como Rodar o Projeto
+
+### Pré-requisitos
 - Node.js 20+
-- Conta no [Supabase](https://supabase.com)
-- Git
+- [Supabase CLI](https://supabase.com/docs/guides/local-development/cli/getting-started) ou conta ativa na nuvem Supabase
 
----
-
-## Instalação Rápida
-
-### 1. Clone o repositório
+### 1. Clonar e instalar dependências
 ```bash
 git clone https://github.com/devraphaeldiniz/ecommerce-supabase.git
 cd ecommerce-supabase
-```
-
-### 2. Instale dependências
-```bash
 npm install
 ```
 
-### 3. Configure variáveis de ambiente
+### 2. Configurar variáveis de ambiente
+Copie o template de ambiente:
 ```bash
 cp .env.example .env
-# Edite o .env com suas credenciais do Supabase
 ```
+Preencha `.env` com a URL do seu projeto e suas chaves Supabase (`SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`). *Atenção: nunca compartilhe ou versione a service role key.*
 
-### 4. Aplique migrations
+### 3. Aplicar migrações ao banco
 ```bash
 npm run db:push
 ```
 
-### 5. Validar setup
+### 4. Validar instalação
 ```bash
 npm run validate:complete
+```
+
+---
+
+## 🧪 Como Rodar os Testes
+
+Execute a suíte com 27 testes automatizados de validação de esquema, RLS, permissões e integridade:
+```bash
 npm test
 ```
 
----
-
-## Documentação Completa
-
-- **[QUICKSTART.md](QUICKSTART.md)** - Guia de instalação em 10 minutos
-- **[ARCHITECTURE.md](ARCHITECTURE.md)** - Decisões técnicas e arquitetura
-- **[ENTREGA.md](ENTREGA.md)** - Documento de entrega do projeto
-
----
-
-## Scripts Disponíveis
-```bash
-npm run validate          # Validar configuração básica
-npm run validate:complete # Validar todas as features
-npm test                  # Executar 27 testes automatizados
-npm run db:push           # Aplicar migrations
-npm run functions:deploy  # Deploy das Edge Functions
-```
+A suíte cobre:
+- Setup e integridade estrutural do banco (12 testes)
+- Resolução e consultas de Views e Materialized Views (7 testes)
+- Regras de controle de acesso RBAC (2 testes)
+- Triggers e logs de auditoria (2 testes)
+- Desempenho e planos de execução (2 testes)
+- Restrições de deleção via DELETE Policies (2 testes)
 
 ---
 
-## Estrutura do Banco
+## 📊 Resultados e Métricas
 
-### Tabelas Principais
-```
-profiles (usuários)
-├── id, auth_uid, full_name, email, cpf, phone, address
-
-products (produtos)
-├── id, sku, name, description, price, stock, category
-
-orders (pedidos)
-├── id, customer_id, status, total, shipping_address
-
-order_items (itens do pedido)
-├── id, order_id, product_id, quantity, unit_price, line_total
-
-order_events (auditoria de pedidos)
-├── id, order_id, event_type, description, metadata
-```
-
-### Tabelas de Segurança
-```
-user_roles (controle de acesso)
-├── id, user_id, role, granted_by, granted_at, is_active
-
-access_logs (log de acessos)
-├── id, user_id, action, table_name, was_successful
-
-security_violations (tentativas não autorizadas)
-├── id, user_id, violation_type, severity, description
-```
-
-### Views e Materialized Views
-```
-Views normais (6):
-- customer_orders_summary
-- products_low_stock
-- recent_orders_details
-- top_selling_products
-- orders_status_overview
-- inactive_customers
-
-Materialized Views (3):
-- daily_sales_stats
-- product_performance_stats
-- customer_rfm_segments
-```
+- **Cobertura de Políticas de Segurança:** 100% das tabelas protegidas por RLS validado por suíte automatizada de testes.
+- **Otimização de Consultas:** 35+ índices criados e validados contra *sequential table scans* em tabelas de alto volume.
+- **Tempo de Execução das Materialized Views:** `TODO: Mensurar tempo de REFRESH MATERIALIZED VIEW sob volume superior a 100.000 pedidos.`
+- **Latência de Leitura via PostgREST:** `TODO: Registrar percentis de latência (p95/p99) para queries autenticadas.`
 
 ---
 
-## Segurança (RLS)
+## ⚠️ Limitações e Próximos Passos
 
-| Tabela | Anônimo | Customer | Staff | Admin |
-|--------|---------|----------|-------|-------|
-| **profiles** | ❌ | ✅ Próprio | ✅ Leitura | ✅ Todos |
-| **products** | ✅ Leitura | ✅ Leitura | ✅ Gerenciar | ✅ Todos |
-| **orders** | ❌ | ✅ Próprios | ✅ Ver todos | ✅ Todos |
-| **user_roles** | ❌ | ✅ Ver próprio | ❌ | ✅ Gerenciar |
-| **access_logs** | ❌ | ✅ Ver próprio | ❌ | ✅ Ver todos |
+- [ ] Configurar job agendado (pg_cron) para atualização periódica das materialized views de analytics.
+- [ ] Implementar política de expiração / retenção de dados históricos na tabela `access_logs`.
+- [ ] Adicionar suporte a webhook para notificações de pagamento de gateways locais.
 
 ---
 
-## API Endpoints
+## 📄 Licença
 
-**Base URL:** `https://byjwgtztyafzgxxzvnge.supabase.co/rest/v1/`
-
-### Produtos
-```bash
-GET  /products                    # Listar produtos
-GET  /products_low_stock          # Produtos com baixo estoque
-GET  /top_selling_products        # Mais vendidos
-```
-
-### Pedidos
-```bash
-GET  /customer_orders_summary     # Resumo de pedidos
-GET  /recent_orders_details       # Pedidos recentes
-POST /orders                      # Criar pedido
-```
-
-### Analytics
-```bash
-GET  /daily_sales_stats           # Estatísticas diárias
-GET  /product_performance_stats   # Performance de produtos
-GET  /customer_rfm_segments       # Segmentação de clientes
-```
-
-### Edge Functions
-```bash
-POST /functions/v1/send-order-email   # Enviar email
-POST /functions/v1/export-order-csv   # Exportar CSV
-```
-
----
-
-## Testes
-```bash
-npm test                  # 27 testes automatizados
-npm run validate:complete # Validação completa do setup
-```
-
-**Cobertura de testes:**
-- Database setup (12 testes)
-- Views e Materialized Views (7 testes)
-- RBAC (2 testes)
-- Auditoria (2 testes)
-- Performance (2 testes)
-- DELETE Policies (2 testes)
-
----
-
-## Deploy
-
-Deploy automático configurado via GitHub Actions.
-
-Push para `main` dispara:
-1. Aplicação de migrations
-2. Deploy das Edge Functions
-3. Execução de testes
-4. Configuração de secrets
-
----
-
-## Suporte
-
-- GitHub Issues: https://github.com/devraphaeldiniz/ecommerce-supabase/issues
-- Documentação Supabase: https://supabase.com/docs
-
----
-
-## Licença
-
-MIT
-
----
-
-**Desenvolvido por Raphael Aloisio Diniz**  
-Backend completo com PostgreSQL, RLS, RBAC e auditoria
+Distribuído sob a licença MIT. Consulte [LICENSE](LICENSE) para mais detalhes.
