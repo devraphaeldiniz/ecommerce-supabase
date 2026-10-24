@@ -11,8 +11,8 @@
 ## Links do Projeto
 
 - **Repositório:** https://github.com/devraphaeldiniz/ecommerce-supabase
-- **Supabase Studio:** https://app.supabase.com/project/byjwgtztyafzgxxzvnge
-- **API Base:** https://byjwgtztyafzgxxzvnge.supabase.co/rest/v1/
+- **Supabase Studio:** https://app.supabase.com/project/<seu-projeto-id>
+- **API Base:** https://<seu-projeto-id>.supabase.co/rest/v1/
 
 ---
 
@@ -89,7 +89,7 @@ customer_rfm_segments     - Segmentação RFM de clientes
 ## Como Testar
 
 ### Visualizar no Supabase Studio
-Acesse: https://app.supabase.com/project/byjwgtztyafzgxxzvnge/editor
+Acesse: https://app.supabase.com/project/<seu-projeto-id>/editor
 
 ### Executar validação completa
 ```bash
@@ -108,13 +108,13 @@ npm test
 
 **Listar produtos:**
 ```bash
-curl "https://byjwgtztyafzgxxzvnge.supabase.co/rest/v1/products?select=*" \
-  -H "apikey: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ5andndHp0eWFmemd4eHp2bmdlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjA2Mjk3NzAsImV4cCI6MjA3NjIwNTc3MH0.L2SU0NDLFLZiIldyTlYuGBLVNcwVZbYA6TmiXmxGsYw"
+curl "https://<seu-projeto-id>.supabase.co/rest/v1/products?select=*" \
+  -H "apikey: <sua-anon-key>"
 ```
 
 **Ou acesse no navegador:**
 ```
-https://byjwgtztyafzgxxzvnge.supabase.co/rest/v1/products?select=*&apikey=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ5andndHp0eWFmemd4eHp2bmdlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjA2Mjk3NzAsImV4cCI6MjA3NjIwNTc3MH0.L2SU0NDLFLZiIldyTlYuGBLVNcwVZbYA6TmiXmxGsYw
+https://<seu-projeto-id>.supabase.co/rest/v1/products?select=*&apikey=<sua-anon-key>
 ```
 
 ---
