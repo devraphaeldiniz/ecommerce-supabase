@@ -1,0 +1,6 @@
+title = "Gitleaks config for ecommerce-supabase"
+
+[allowlist]
+description = "Segredos reais no histórico do Git (não reescrevemos histórico); ENTREGA.md e .env antigos"
+files = ["ENTREGA.md", ".env"]
+commit = ["eff9d97280e96dc4ee86b07929d344a405c50c24", "36d91161ed34006e383bec1c672e1cf9645adb2b"]
