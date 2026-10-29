@@ -135,13 +135,13 @@ A suíte cobre:
 
 - **Cobertura de Políticas de Segurança:** 100% das tabelas protegidas por RLS validado por suíte automatizada de testes.
 - **Otimização de Consultas:** 35+ índices criados e validados contra *sequential table scans* em tabelas de alto volume.
-- **Tempo de Execução das Materialized Views:** `TODO: Mensurar tempo de REFRESH MATERIALIZED VIEW sob volume superior a 100.000 pedidos.`
-- **Latência de Leitura via PostgREST:** `TODO: Registrar percentis de latência (p95/p99) para queries autenticadas.`
 
 ---
 
 ## ⚠️ Limitações e Próximos Passos
 
+- [ ] Medir o tempo de `REFRESH MATERIALIZED VIEW` com mais de 100.000 pedidos.
+- [ ] Medir a latência p95/p99 das consultas autenticadas via PostgREST.
 - [ ] Configurar job agendado (pg_cron) para atualização periódica das materialized views de analytics.
 - [ ] Implementar política de expiração / retenção de dados históricos na tabela `access_logs`.
 - [ ] Adicionar suporte a webhook para notificações de pagamento de gateways locais.
