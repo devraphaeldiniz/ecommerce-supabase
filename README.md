@@ -85,7 +85,7 @@ flowchart TD
 ## 🚀 Como Rodar o Projeto
 
 ### Pré-requisitos
-- Node.js 20+
+- Node.js 22.12+
 - [Supabase CLI](https://supabase.com/docs/guides/local-development/cli/getting-started) ou conta ativa na nuvem Supabase
 
 ### 1. Clonar e instalar dependências
