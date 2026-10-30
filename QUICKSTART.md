@@ -6,7 +6,7 @@ Este guia irá te ajudar a configurar o projeto em menos de 10 minutos.
 
 ## Checklist Rápido
 
-- [ ] Node.js 20+ instalado
+- [ ] Node.js 22.12+ instalado
 - [ ] Conta no Supabase criada
 - [ ] Git instalado
 
